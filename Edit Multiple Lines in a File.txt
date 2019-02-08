@@ -1,0 +1,83 @@
+Ref: https://stackoverflow.com/questions/47475015/edit-multiple-lines-of-text-file-using-bash-script
+Question:
+So, is it possible to edit a text file using a bash script?
+Content of TextFile1 (for example):
+internalField nonuniform List<scalar>
+7
+(
+0
+1
+2
+3
+4
+5
+6
+);
+boundaryField
+{
+ left
+ {
+  type fixedValue;
+  value uniform 1;
+ }
+}
+Now, the bash file shall change the file as:
+
+internalField nonuniform List<scalar>
+7
+(
+0
+1
+2
+3
+4
+5
+6
+);
+boundaryField
+{
+ left
+ {
+  type groovyBC;
+  valueExpression "-pc";
+  variables       "pc@left=pc;";
+  value           uniform 0;
+ }
+}
+
+#!/bin/bash
+#
+insideleft='false'
+while read line
+do
+    # using grep -c to make sure it matches even if there are spaces
+    if [ $(echo $line | grep -c left) -eq 1 ]
+    then
+        insideleft='true'
+        cat <<HEREDOC
+  left
+  {
+    type groovyBC;
+    valueExpression "-pc";
+    variables       "pc@left=pc;";
+    value           uniform 0;
+  }
+HEREDOC
+    else
+        if [ $insideleft == 'false' ]
+        then
+            echo $line
+        else
+            if [ $(echo $line | grep -c '}') -eq 1 ]
+            then
+                insideleft='false'
+            fi
+        fi
+    fi
+done <data
+
+# Basically, once the line "left" is found, output the new text, and loop over the input file lines until the }, 
+# closing the left section is found. I tried it with your input and output sample, it works fine.
+
+# Note: in the last line, "data" is the filename you want to modify.
+#  Lets say you call the script "edit.bash". Run it like this: edit.bash >output_file.txt
