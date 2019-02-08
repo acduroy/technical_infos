@@ -1,0 +1,59 @@
+How to append multiple lines to a file using bash script:
+Ref: https://unix.stackexchange.com/questions/77277/how-to-append-multiple-lines-to-a-file
+
+Question:
+I am writing a bash script to look for a file if it doesn't exist then create it and append this to it:
+Host localhost
+    ForwardAgent yes
+
+# Possibility 1:
+echo "line 1" >> greetings.txt
+echo "line 2" >> greetings.txt
+
+# Possibility 2:
+echo "line 1
+line 2" >> greetings.txt
+
+# Possibility 3:
+cat <<EOT >> greetings.txt
+line 1
+line 2
+EOT
+
+# Possibility 4:
+# -e will enable the interpretation of backslashes
+echo -e "Host localhost\n\tForwardAgent yes" >> file.txt
+
+# Possiblity 5: 
+# if file to write needs sudo used tee command with "-a" w/c means to append and not to overwrite the file
+echo "line 1" | sudo tee -a file >/dev/null 
+
+# Possibility 6:
+printf '%s\n    %s\n' 'Host localhost' 'ForwardAgent yes' >> file.txt
+    Or, if it's a literal tab that you want instead of number of spaces
+printf '%s\n\t%s\n' 'Host localhost' 'ForwardAgent yes' >> file.txt
+
+Comment on #6:
+1. this doesn't work. %s means - literally interpreted string argument
+2. You can use \n for newline in your format argument (where you have '%s'), but not in the rest
+
+# Possibility 7:
+# Using tee command
+tee -a ~/.ssh/config << END
+Host localhost
+  ForwardAgent yes
+END
+
+# Possibility 8:
+# SED can append a line to the end of a file like so:
+# Source: http://www.yourownlinux.com/2015/04/sed-command-in-linux-append-and-insert-lines-to-file.html
+
+sed -i '$ a text to be inserted' fileName.file
+$ selects end of file, the a tells it to append, and after this comes the text that is to be inserted. 
+Then of course the file name
+
+# this approach has the added benefit of appending to any files return in a search, such as this: find . 
+# -name "*.html" -exec sed -i '$ a </html>' {} \;
+# I used the above example to insert the ending html tag that was missing on every html page within a 
+# number of directories.
+
