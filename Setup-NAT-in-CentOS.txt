@@ -1,0 +1,131 @@
+Step-By-Step Configuration of NAT with iptables
+Ref: https://www.howtoforge.com/nat_iptables
+
+This tutorial shows how to set up network-address-translation (NAT) on a Linux system 
+with iptables rules so that the system can act as a gateway and provide internet access 
+to multiple hosts on a local network using a single public IP address. This is achieved 
+by rewriting the source and/or destination addresses of IP packets as they pass through 
+the NAT system. 
+
+Requirements:
+CPU - PII or more
+OS - Any Linux distribution
+Software - Iptables
+Network Interface Cards: 2
+
+Here is my considerations:
+
+Replace xx.xx.xx.xx with your WAN IP
+
+Replace yy.yy.yy.yy with your LAN IP
+
+(i.e. 192.168.0.0/16, 172.16.0.0/12,  10.0.0.0/8 as suggested by Mr. tzs)
+
+WAN = eth0 with public IP xx.xx.xx.xx
+LAN = eth1 with private IP yy.yy.yy.yy/ 255.255.0.0
+
+Step by Step Procedure
+Step #1. Add 2 Network cards to the Linux box
+
+Step #2. Verify the Network cards, Wether they installed properly or not
+
+ls /etc/sysconfig/network-scripts/ifcfg-eth* | wc -l
+    ( The output should be "2")
+
+Step #3. Configure eth0 for Internet with a Public ( IP External network or Internet)
+
+cat /etc/sysconfig/network-scripts/ifcfg-eth0
+DEVICE=eth0
+BOOTPROTO=none
+BROADCAST=xx.xx.xx.255    # Optional Entry
+HWADDR=00:50:BA:88:72:D4    # Optional Entry
+IPADDR=xx.xx.xx.xx
+NETMASK=255.255.255.0    # Provided by the ISP
+NETWORK=xx.xx.xx.0       # Optional
+ONBOOT=yes
+TYPE=Ethernet
+USERCTL=no
+IPV6INIT=no
+PEERDNS=yes
+GATEWAY=xx.xx.xx.1    # Provided by the ISP
+
+Step #4. Configure eth1 for LAN with a Private IP (Internal private network)
+
+cat /etc/sysconfig/network-scripts/ifcfg-eth1
+BOOTPROTO=none
+PEERDNS=yes
+HWADDR=00:50:8B:CF:9C:05    # Optional
+TYPE=Ethernet
+IPV6INIT=no
+DEVICE=eth1
+NETMASK=255.255.0.0        # Specify based on your requirement
+BROADCAST=""
+IPADDR=192.168.2.1        # Gateway of the LAN
+NETWORK=192.168.0.0        # Optional
+USERCTL=no
+ONBOOT=yes
+
+Step #5. Host Configuration    (Optional)
+
+cat /etc/hosts
+    127.0.0.1       nat localhost.localdomain   localhost
+
+Step #6. Gateway Configuration
+
+cat /etc/sysconfig/network
+    NETWORKING=yes
+    HOSTNAME=nat
+    GATEWAY=xx.xx.xx.1    # Internet Gateway, provided by the ISP
+
+Step #7. DNS Configuration
+
+cat /etc/resolv.conf
+    nameserver 203.145.184.13      # Primary DNS Server provided by the ISP
+    nameserver 202.56.250.5        # Secondary DNS Server provided by the ISP
+
+Step #8. NAT configuration with IP Tables
+
+    # Delete and flush. Default table is "filter". Others like "nat" must be explicitly 
+    # stated.
+
+iptables --flush            # Flush all the rules in filter and nat tables
+iptables --table nat --flush
+iptables --delete-chain
+# Delete all chains that are not in default filter and nat table
+
+iptables --table nat --delete-chain
+# Set up IP FORWARDing and Masquerading
+
+iptables --table nat --append POSTROUTING --out-interface eth0 -j MASQUERADE
+iptables --append FORWARD --in-interface eth1 -j ACCEPT
+# Enables packet forwarding by kernel 
+
+echo 1 > /proc/sys/net/ipv4/ip_forward
+ #Apply the configuration
+
+service iptables restart
+
+Step #9. Testing
+ # Ping the Gateway of the network from client system
+
+ping 192.168.2.1
+Try it on your client systems
+
+ping google.com
+ Configuring PCs on the network (Clients)
+•    All PC's on the private office network should set their "gateway" to be the local 
+     private network IP address of the Linux gateway computer.
+•    The DNS should be set to that of the ISP on the internet.
+
+Windows '95, 2000, XP,  Configuration:
+
+•    Select "Start" + Settings" + "Control Panel"
+•    Select the "Network" icon
+•    Select the tab "Configuration" and double click the component "TCP/IP" for the 
+     ethernet card. (NOT the TCP/IP -> Dial-Up Adapter)
+
+•    Select the tabs:
+o    "Gateway": Use the internal network IP address of the Linux box. (192.168.2.1)
+o    "DNS Configuration": Use the IP addresses of the ISP Domain Name Servers. 
+     (Actual internet IP address)
+o    "IP Address": The IP address (192.168.XXX.XXX - static) and netmask (typically 255.255.0.0 for a small local office network) of the PC can also be set here.
