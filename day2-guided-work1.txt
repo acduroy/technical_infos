@@ -1,0 +1,191 @@
+Chapter4. Creating BlueStore OSDs Using Logical Volumes
+[student@workstation ~]$ lab start component-osd
+
+Instructions
+ 1. Log in to clienta as the admin user and use sudo to run the cephadm shell.
+[student@workstation ~]$ ssh admin@clienta
+[admin@clienta ~]$ sudo cephadm shell
+[ceph: root@clienta /]#
+
+
+2. Verify the health of the cluster. View the current cluster size. View the current OSD tree.
+2.1. Verify the health of the cluster.
+[ceph: root@clienta /]# ceph health
+HEALTH_OK
+2.2. View the current cluster storage size.
+[ceph: root@clienta /]# ceph df
+--- RAW STORAGE ---
+CLASS SIZE AVAIL USED RAW USED %RAW USED
+hdd 90 GiB 90 GiB 180 MiB 180 MiB 0.20
+TOTAL 90 GiB 90 GiB 180 MiB 180 MiB 0.20
+...output omitted...
+
+[ceph: root@clienta /]# ceph osd tree
+ID CLASS WEIGHT TYPE NAME STATUS REWEIGHT PRI-AFF
+-1 0.08817 root default
+-3 0.02939 host serverc
+ 0 hdd 0.00980 osd.0 up 1.00000 1.00000
+ 1 hdd 0.00980 osd.1 up 1.00000 1.00000
+ 2 hdd 0.00980 osd.2 up 1.00000 1.00000
+-5 0.02939 host serverd
+ 3 hdd 0.00980 osd.3 up 1.00000 1.00000
+ 4 hdd 0.00980 osd.4 up 1.00000 1.00000
+ 5 hdd 0.00980 osd.5 up 1.00000 1.00000
+-7 0.02939 host servere
+ 6 hdd 0.00980 osd.6 up 1.00000 1.00000
+ 7 hdd 0.00980 osd.7 up 1.00000 1.00000
+ 8 hdd 0.00980 osd.8 up 1.00000 1.00000
+ 
+3. List all active disk devices in
+[ceph: root@clienta /]# ceph device ls
+
+3.2. Use grep or awk to filter available devices from the ceph orch device ls
+command.
+[ceph: root@clienta /]# ceph orch device ls | awk /server/ | grep Yes
+serverc.lab.example.com /dev/vde hdd c63...82a-b 10.7G Unknown N/A N/A Yes
+serverc.lab.example.com /dev/vdf hdd 6f2...b8e-9 10.7G Unknown N/A N/A Yes
+serverd.lab.example.com /dev/vde hdd f84...6f0-8 10.7G Unknown N/A N/A Yes
+serverd.lab.example.com /dev/vdf hdd 297...63c-9 10.7G Unknown N/A N/A Yes
+servere.lab.example.com /dev/vde hdd 2aa...c03-b 10.7G Unknown N/A N/A Yes
+servere.lab.example.com /dev/vdf hdd 41c...794-b 10.7G Unknown N/A N/A Yes
+
+ 4. Create two OSD daemons by using the disk devices /dev/vde and /dev/vdf on
+serverc.lab.example.com. Record the ID assigned to each OSD. Verify that the
+daemons are running correctly. View the cluster storage size and the new OSD tree.
+
+
+4.1. Create an OSD daemon by using device /dev/vde on
+serverc.lab.example.com.
+[ceph: root@clienta /]# ceph orch daemon add osd serverc.lab.example.com:/dev/vde
+Created osd(s) 9 on host 'serverc.lab.example.com'
+4.2. Create an OSD daemon by using device /dev/vdf on
+serverc.lab.example.com.
+[ceph: root@clienta /]# ceph orch daemon add osd serverc.lab.example.com:/dev/vdf
+Created osd(s) 10 on host 'serverc.lab.example.com'
+4.3. Verify that the daemons are running.
+[ceph: root@clienta /]# ceph orch ps | grep -ie osd.9 -ie osd.10
+osd.9 serverc.lab.example.com running (6m) 6m ago 6m ...
+osd.10 serverc.lab.example.com running (6m) 6m ago 6m ...
+4.4. View the cluster storage size.
+[ceph: root@clienta /]# ceph df
+--- RAW STORAGE ---
+CLASS SIZE AVAIL USED RAW USED %RAW USED
+hdd 110 GiB 110 GiB 297 MiB 297 MiB 0.26
+TOTAL 110 GiB 110 GiB 297 MiB 297 MiB 0.26
+...output omitted...
+4.5. View the OSD tree.
+[ceph: root@clienta /]# ceph osd tree
+ID CLASS WEIGHT TYPE NAME STATUS REWEIGHT PRI-AFF
+-1 0.10776 root default
+-3 0.04898 host serverc
+ 0 hdd 0.00980 osd.0 up 1.00000 1.00000
+ 1 hdd 0.00980 osd.1 up 1.00000 1.00000
+ 2 hdd 0.00980 osd.2 up 1.00000 1.00000
+9 hdd 0.00980 osd.9 up 1.00000 1.00000
+10 hdd 0.00980 osd.10 up 1.00000 1.00000
+-5 0.02939 host serverd
+ 3 hdd 0.00980 osd.3 up 1.00000 1.00000
+ 4 hdd 0.00980 osd.4 up 1.00000 1.00000
+ 5 hdd 0.00980 osd.5 up 1.00000 1.00000
+-7 0.02939 host servere
+ 6 hdd 0.00980 osd.6 up 1.00000 1.00000
+ 7 hdd 0.00980 osd.7 up 1.00000 1.00000
+ 8 hdd 0.00980 osd.8 up 1.00000 1.00000
+ 5. Enable the orchestrator service to create OSD daemons automatically from the available
+cluster devices. Verify the creation of the all-available-devices OSD service, and
+the existence of new OSD daemons.
+
+5.1. Enable the orchestrator service to create OSD daemons automatically from the
+available cluster devices.
+[ceph: root@clienta /]# ceph orch apply osd --all-available-devices
+Scheduled osd.all-available-devices update...
+5.2. Verify the creation of the all-available-devices OSD service.
+[ceph: root@clienta /]# ceph orch ls
+NAME RUNNING REFRESHED AGE PLACEMENT
+alertmanager 1/1 11s ago 13h count:1
+crash 4/4 5m ago 13h *
+grafana 1/1 11s ago 13h count:1
+mgr 4/4 5m ago 13h ...
+mon 4/4 5m ago 13h ...
+node-exporter 1/4 5m ago 13h *
+osd.all-available-devices 0/4 - 10s *
+osd.default_drive_group 9/12 5m ago 13h server*
+osd.unmanaged 2/2 11s ago - <unmanaged>
+prometheus 1/1 11s ago 13h count:1
+rgw.realm.zone 2/2 5m ago 8m ...
+5.3. Verify the existence of new OSDs.
+[ceph: root@clienta /]# ceph osd tree
+ID CLASS WEIGHT TYPE NAME STATUS REWEIGHT PRI-AFF
+-1 0.19592 root default
+-9 0.04898 host clienta
+12 hdd 0.00980 osd.12 up 1.00000 1.00000
+16 hdd 0.00980 osd.16 up 1.00000 1.00000
+17 hdd 0.00980 osd.17 up 1.00000 1.00000
+18 hdd 0.00980 osd.18 up 1.00000 1.00000
+19 hdd 0.00980 osd.19 up 1.00000 1.00000
+-3 0.04898 host serverc
+ 0 hdd 0.00980 osd.0 up 1.00000 1.00000
+ 1 hdd 0.00980 osd.1 up 1.00000 1.00000
+ 2 hdd 0.00980 osd.2 up 1.00000 1.00000
+ 9 hdd 0.00980 osd.9 up 1.00000 1.00000
+10 hdd 0.00980 osd.10 up 1.00000 1.00000
+-5 0.04898 host serverd
+ 3 hdd 0.00980 osd.3 up 1.00000 1.00000
+ 4 hdd 0.00980 osd.4 up 1.00000 1.00000
+ 5 hdd 0.00980 osd.5 up 1.00000 1.00000
+11 hdd 0.00980 osd.11 up 1.00000 1.00000
+14 hdd 0.00980 osd.14 up 1.00000 1.00000
+-7 0.04898 host servere
+ 6 hdd 0.00980 osd.6 up 1.00000 1.00000
+ 7 hdd 0.00980 osd.7 up 1.00000 1.00000
+ 8 hdd 0.00980 osd.8 up 1.00000 1.00000
+13 hdd 0.00980 osd.13 up 1.00000 1.00000
+15 hdd 0.00980 osd.15 up 1.00000 1.00000
+
+6. Stop the OSD daemon associated with the /dev/vde device on servere and remove it.
+Verify the removal process ends correctly. Zap the /dev/vde device on servere. Verify
+that the Orchestrator service then re-adds the OSD daemon correctly.
+Note
+It is expected that the OSD ID might be different in your lab
+environment. Review the output of the ceph device ls | grep
+'servere.lab.example.com:vde' and use the ID to perform the next steps.
+6.1. Stop the OSD daemon associated with the /dev/vde device on
+servere.lab.example.com and remove it.
+[ceph: root@clienta /]# ceph device ls | grep 'servere.lab.example.com:vde'
+2aa9ab0c-9d12-4c03-b servere.lab.example.com:vde osd.ID
+[ceph: root@clienta /]# ceph orch daemon stop osd.ID
+Scheduled to stop osd.ID on host 'servere.lab.example.com'
+[ceph: root@clienta /]# ceph orch daemon rm osd.ID --force
+Scheduled OSD(s) for removal
+[ceph: root@clienta /]# ceph osd rm ID
+removed osd.ID
+[ceph: root@clienta /]# ceph orch osd rm status
+OSD_ID HOST STATE PG_COUNT REPLACE FORCE
+ DRAIN_STARTED_AT
+ID servere.lab.example.com done, waiting for purge 0 False False
+ None
+6.2. Verify that the removal process ends correctly.
+[ceph: root@clienta /]# ceph orch osd rm status
+No OSD remove/replace operations reported
+6.3. Zap the /dev/vde device on servere. Verify that the Orchestrator service re-adds
+the OSD daemon correctly.
+[ceph: root@clienta /]# ceph orch device zap --force \
+servere.lab.example.com /dev/vde
+[ceph: root@clienta /]# ceph orch device ls | awk /servere/
+servere.lab.example.com /dev/vdb hdd 50a...56b-8 10.7G Unknown N/A N/A No
+servere.lab.example.com /dev/vdc hdd eb7...5a6-9 10.7G Unknown N/A N/A No
+servere.lab.example.com /dev/vdd hdd 407...56f-a 10.7G Unknown N/A N/A No
+servere.lab.example.com /dev/vde hdd 2aa...c03-b 10.7G Unknown N/A N/A Yes
+servere.lab.example.com /dev/vdf hdd 41c...794-b 10.7G Unknown N/A N/A No
+[ceph: root@clienta /]# ceph orch device ls | awk /servere/
+servere.lab.example.com /dev/vdb hdd 50a...56b-8 10.7G Unknown N/A N/A No
+servere.lab.example.com /dev/vdc hdd eb7...5a6-9 10.7G Unknown N/A N/A No
+servere.lab.example.com /dev/vdd hdd 407...56f-a 10.7G Unknown N/A N/A No
+servere.lab.example.com /dev/vde hdd 2aa...c03-b 10.7G Unknown N/A N/A No
+servere.lab.example.com /dev/vdf hdd 41c...794-b 10.7G Unknown N/A N/A No
+[ceph: root@clienta /]# ceph device ls | grep 'servere.lab.example.com:vde'
+osd.ID
+[ceph: root@clienta /]# ceph orch ps | grep osd.ID
+osd.ID servere.lab.example.com running (76s) 66s ago 76s ...
+
+
